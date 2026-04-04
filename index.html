@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Добавить ключ в HAPP</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f1226;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .box {
+      width: 100%;
+      max-width: 520px;
+      background: #171c3a;
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+    p {
+      margin: 0 0 18px;
+      color: #bfc7ff;
+      line-height: 1.5;
+    }
+    .btn {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 16px 18px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .primary {
+      background: #9b87f5;
+      color: #fff;
+    }
+    .ghost {
+      background: #24305f;
+      color: #d9e2ff;
+    }
+    .status {
+      margin-top: 16px;
+      font-size: 14px;
+      color: #9fb0ff;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Добавить ключ в HAPP</h1>
+    <p>Нажмите кнопку ниже. HAPP откроется сам и предложит добавить ключ.</p>
+
+    <button class="btn primary" id="openBtn">Открыть в HAPP</button>
+    <button class="btn ghost" id="copyBtn">Скопировать ключ</button>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("key") || window.location.hash.slice(1);
+    const key = raw ? decodeURIComponent(raw) : "";
+
+    const statusEl = document.getElementById("status");
+    const openBtn = document.getElementById("openBtn");
+    const copyBtn = document.getElementById("copyBtn");
+
+    function validLink(v) {
+      return /^hy2:\/\//i.test(v) || /^happ:\/\//i.test(v);
+    }
+
+    function openInHapp() {
+      if (!validLink(key)) {
+        statusEl.textContent = "Ключ не найден или ссылка повреждена.";
+        return;
+      }
+      statusEl.textContent = "Пробую открыть HAPP...";
+      window.location.href = key;
+
+      setTimeout(() => {
+        statusEl.textContent = "Если HAPP не открылся, нажмите кнопку ещё раз или скопируйте ключ.";
+      }, 1500);
+    }
+
+    async function copyKey() {
+      if (!key) {
+        statusEl.textContent = "Ключ не найден.";
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(key);
+        statusEl.textContent = "Ключ скопирован.";
+      } catch {
+        statusEl.textContent = "Не удалось скопировать ключ.";
+      }
+    }
+
+    openBtn.addEventListener("click", openInHapp);
+    copyBtn.addEventListener("click", copyKey);
+
+    if (params.get("auto") === "1" && validLink(key)) {
+      setTimeout(openInHapp, 300);
+    }
+  </script>
+</body>
+</html>
