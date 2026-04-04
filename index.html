@@ -52,33 +52,118 @@
       background: #24305f;
       color: #d9e2ff;
     }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
     .status {
       margin-top: 16px;
       font-size: 14px;
       color: #9fb0ff;
       min-height: 20px;
     }
+    .no-key {
+      background: #2a1020;
+      border: 1px solid #6a1a30;
+      border-radius: 12px;
+      padding: 16px;
+      color: #ff8888;
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .steps {
+      text-align: left;
+      margin-top: 24px;
+      border-top: 1px solid #2a3060;
+      padding-top: 20px;
+    }
+    .steps-title {
+      font-size: 12px;
+      color: #5060a0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+    .step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .step-n {
+      min-width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #1e2450;
+      border: 1px solid #3a4080;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7080c0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-t {
+      font-size: 14px;
+      color: #9090c0;
+      line-height: 1.5;
+    }
+    .step-t b { color: #d0d8ff; }
   </style>
 </head>
 <body>
   <div class="box">
     <h1>Добавить ключ в HAPP</h1>
-    <p>Нажмите кнопку ниже. HAPP откроется сам и предложит добавить ключ.</p>
+
+    <div class="no-key" id="noKeyMsg" style="display:none">
+      ⚠️ Ключ не найден.<br>Обратитесь к администратору за личной ссылкой.
+    </div>
+
+    <p id="desc">Нажмите кнопку ниже. HAPP откроется сам и предложит добавить ключ.</p>
 
     <button class="btn primary" id="openBtn">Открыть в HAPP</button>
     <button class="btn ghost" id="copyBtn">Скопировать ключ</button>
-
     <div class="status" id="status"></div>
+
+    <div class="steps">
+      <div class="steps-title">Если не открылось автоматически</div>
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-t">Нажми <b>«Скопировать ключ»</b></div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-t">Открой приложение <b>HAPP</b></div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-t">Нажми <b>«+»</b> → <b>«Вставить из буфера»</b></div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-t">Нажми <b>«Сохранить»</b> — готово!</div>
+      </div>
+    </div>
   </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const raw = params.get("key") || window.location.hash.slice(1);
+    const raw = params.get("k") || params.get("key") || window.location.hash.slice(1);
     const key = raw ? decodeURIComponent(raw) : "";
 
     const statusEl = document.getElementById("status");
-    const openBtn = document.getElementById("openBtn");
-    const copyBtn = document.getElementById("copyBtn");
+    const openBtn  = document.getElementById("openBtn");
+    const copyBtn  = document.getElementById("copyBtn");
+
+    if (!key) {
+      document.getElementById("noKeyMsg").style.display = "block";
+      document.getElementById("desc").style.display = "none";
+      openBtn.disabled = true;
+      copyBtn.disabled = true;
+    }
 
     function validLink(v) {
       return /^hy2:\/\//i.test(v) || /^happ:\/\//i.test(v);
@@ -91,22 +176,28 @@
       }
       statusEl.textContent = "Пробую открыть HAPP...";
       window.location.href = key;
-
       setTimeout(() => {
-        statusEl.textContent = "Если HAPP не открылся, нажмите кнопку ещё раз или скопируйте ключ.";
-      }, 1500);
+        // Если приложение не открылось — копируем автоматически
+        navigator.clipboard && navigator.clipboard.writeText(key);
+        statusEl.textContent = "Если HAPP не открылся — ключ уже скопирован, вставь вручную через «+».";
+      }, 1800);
     }
 
     async function copyKey() {
-      if (!key) {
-        statusEl.textContent = "Ключ не найден.";
-        return;
-      }
+      if (!key) { statusEl.textContent = "Ключ не найден."; return; }
       try {
         await navigator.clipboard.writeText(key);
-        statusEl.textContent = "Ключ скопирован.";
+        copyBtn.textContent = "✓ Скопировано!";
+        copyBtn.style.background = "#1a3a28";
+        copyBtn.style.color = "#60d090";
+        statusEl.textContent = "Ключ скопирован — открой HAPP и вставь через «+».";
+        setTimeout(() => {
+          copyBtn.textContent = "Скопировать ключ";
+          copyBtn.style.background = "";
+          copyBtn.style.color = "";
+        }, 2500);
       } catch {
-        statusEl.textContent = "Не удалось скопировать ключ.";
+        statusEl.textContent = "Не удалось скопировать — скопируй вручную.";
       }
     }
 
