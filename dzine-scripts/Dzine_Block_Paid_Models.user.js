@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dzine — запрет платных моделей + GPT Image 2.0 + 1K по умолчанию
 // @namespace    klub-dzine
-// @version      1.3
+// @version      1.4
 // @description  Если выбрана платная модель (Ideogram 4.5, Seedream 5.0 Flash, Nano Banana 2.1) — генерация не запускается, и скрипт сам переключает на GPT Image 2.0. При открытии Dzine сразу ставит GPT Image 2.0.
 // @match        *://*.dzine.ai/*
 // @match        *://dzine.ai/*
@@ -164,6 +164,18 @@
         return res;
     }
 
+    // Закрытие выпадашки (из старого скрипта 1K): Escape этот компонент НЕ слушает,
+    // поэтому жмём кнопку ещё раз, а если не вышло — «клик мимо» по пустому месту.
+    function closeMenu(btn) {
+        try { if (btn && document.contains(btn)) { btn.click(); return; } } catch (e) {}
+        try {
+            const x = 5, y = Math.max(60, Math.floor(window.innerHeight / 2));
+            const el = document.elementFromPoint(x, y) || document.body;
+            ['pointerdown', 'mousedown', 'mouseup', 'click'].forEach(type =>
+                el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y })));
+        } catch (e) {}
+    }
+
     let sizeBusy = false, sizeDoneFor = null, manualUntil = 0;
     // ручной выбор размера уважаем: если человек сам открыл выпадашку — не спорим, пока не сменит модель
     document.addEventListener('pointerdown', (e) => {
@@ -191,9 +203,9 @@
             } else log('не нашёл варианты размера');
             sizeDoneFor = model;
             setTimeout(() => {
-                if (sizeOptions().length) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                if (sizeOptions().length) closeMenu(sizeBtn());   // свернуть, только если ещё открыта
                 sizeBusy = false;
-            }, 200);
+            }, 250);
         }, 400);
     }
 
