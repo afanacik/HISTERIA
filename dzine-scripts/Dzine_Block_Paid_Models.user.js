@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Dzine — запрет платных моделей + GPT Image 2.0 по умолчанию
+// @name         Dzine — запрет платных моделей + GPT Image 2.0 + 1K по умолчанию
 // @namespace    klub-dzine
-// @version      1.2
+// @version      1.3
 // @description  Если выбрана платная модель (Ideogram 4.5, Seedream 5.0 Flash, Nano Banana 2.1) — генерация не запускается, и скрипт сам переключает на GPT Image 2.0. При открытии Dzine сразу ставит GPT Image 2.0.
 // @match        *://*.dzine.ai/*
 // @match        *://dzine.ai/*
@@ -32,7 +32,11 @@
         const l = document.querySelector(WRAP + ' .option-label');
         return l ? norm(l.textContent) : null;
     };
-    const isBlocked = () => BLOCKED.includes(currentModel());
+    // сравнение без учёта регистра и пробелов («Seedream 5.0 Flash» = «seedream 5.0  flash»)
+    const key = (s) => norm(s).toLowerCase().replace(/\s+/g, '');
+    const BLOCKED_KEYS = BLOCKED.map(key);
+    const isBlockedName = (n) => !!n && BLOCKED_KEYS.some(b => key(n) === b || key(n).startsWith(b));
+    const isBlocked = () => isBlockedName(currentModel());
 
     // ---------- уведомление ----------
     function toast(msg) {
@@ -131,18 +135,74 @@
         }
         if (cur !== prev) {                    // пользователь сменил модель
             prev = cur;
-            if (BLOCKED.includes(cur)) {
+            log('модель сменилась на: "' + cur + '"');
+            if (isBlockedName(cur)) {
                 toast('⛔ «' + cur + '» тратит кредиты — возвращаю ' + DEFAULT_MODEL);
                 setTimeout(() => selectDefault('выбрана платная модель'), 600);
             }
         }
     }
 
+    // ---------- 3) РАЗМЕР 1K (минимальный доступный) ----------
+    // Кнопка «соотношение | размер | качество» — id вида chat-editor-XXX-aspect-ratio-option-wrapper
+    const SIZE_BTN = '[id$="-aspect-ratio-option-wrapper"] > .c-tip > button';
+    const sizeBtn = () => document.querySelector(SIZE_BTN);
+    const isSize = (t) => /^\d+K$/i.test(t);
+    function currentSize() {
+        const b = sizeBtn(); if (!b) return null;
+        for (const l of b.querySelectorAll('.option-label')) { const t = norm(l.textContent); if (isSize(t)) return t; }
+        return null;
+    }
+    // варианты размера в открытой выпадашке (не на самой кнопке)
+    function sizeOptions() {
+        const res = [];
+        for (const el of document.querySelectorAll('div, span, p, li, button')) {
+            if (el.children.length > 1) continue;
+            const t = norm(el.textContent);
+            if (isSize(t) && !el.closest(SIZE_BTN)) res.push({ el, t, n: parseInt(t, 10) });
+        }
+        return res;
+    }
+
+    let sizeBusy = false, sizeDoneFor = null, manualUntil = 0;
+    // ручной выбор размера уважаем: если человек сам открыл выпадашку — не спорим, пока не сменит модель
+    document.addEventListener('pointerdown', (e) => {
+        if (e.isTrusted && e.target.closest && e.target.closest('[id$="-aspect-ratio-option-wrapper"]')) {
+            manualUntil = Date.now() + 8000;
+            sizeDoneFor = currentModel();
+        }
+    }, true);
+
+    function enforceSize() {
+        if (sizeBusy || busy || Date.now() < manualUntil) return;
+        const model = currentModel(), size = currentSize();
+        if (!model || !size || sizeDoneFor === model) return;
+        if (size.toUpperCase() === '1K') { sizeDoneFor = model; return; }
+
+        sizeBusy = true;
+        sizeBtn().click();                                   // открыть выпадашку
+        setTimeout(() => {
+            const opts = sizeOptions();
+            if (opts.length) {
+                opts.sort((a, b) => a.n - b.n);
+                const min = opts[0];
+                if (min.t.toUpperCase() !== size.toUpperCase()) { (min.el.closest('button, li, [role="option"], div') || min.el).click(); log('поставил размер', min.t); }
+                else log('минимум уже стоит:', size);
+            } else log('не нашёл варианты размера');
+            sizeDoneFor = model;
+            setTimeout(() => {
+                if (sizeOptions().length) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+                sizeBusy = false;
+            }, 200);
+        }, 400);
+    }
+
     function start() {
         if (!document.body) { setTimeout(start, 80); return; }
         setInterval(tick, 700);
+        setInterval(() => { try { enforceSize(); } catch (e) { sizeBusy = false; } }, 900);
         setInterval(() => {
-            if (location.href !== lastUrl) { lastUrl = location.href; pageDone = false; }
+            if (location.href !== lastUrl) { lastUrl = location.href; pageDone = false; sizeDoneFor = null; }
         }, 700);
     }
     start();
