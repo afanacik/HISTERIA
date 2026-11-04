@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dzine — запрет платных моделей + GPT Image 2.0 + 1K по умолчанию
 // @namespace    klub-dzine
-// @version      1.4
+// @version      1.5
 // @description  Если выбрана платная модель (Ideogram 4.5, Seedream 5.0 Flash, Nano Banana 2.1) — генерация не запускается, и скрипт сам переключает на GPT Image 2.0. При открытии Dzine сразу ставит GPT Image 2.0.
 // @match        *://*.dzine.ai/*
 // @match        *://dzine.ai/*
@@ -153,13 +153,21 @@
         for (const l of b.querySelectorAll('.option-label')) { const t = norm(l.textContent); if (isSize(t)) return t; }
         return null;
     }
-    // варианты размера в открытой выпадашке (не на самой кнопке)
+    // Окошко размера вынесено в конец страницы: id = id кнопки, но «-option-list» вместо «-option-wrapper».
+    // Внутри: .tab-list > .c-tip > .tab-item «1K / 2K / 4K». Кликать нужно именно .tab-item.
+    function sizeList() {
+        const w = document.querySelector('[id$="-aspect-ratio-option-wrapper"]');
+        return w ? document.getElementById(w.id.replace(/-option-wrapper$/, '-option-list')) : null;
+    }
+    const visible = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+    const sizeListOpen = () => visible(sizeList());
     function sizeOptions() {
+        const list = sizeList();
+        if (!visible(list)) return [];
         const res = [];
-        for (const el of document.querySelectorAll('div, span, p, li, button')) {
-            if (el.children.length > 1) continue;
+        for (const el of list.querySelectorAll('.tab-item')) {
             const t = norm(el.textContent);
-            if (isSize(t) && !el.closest(SIZE_BTN)) res.push({ el, t, n: parseInt(t, 10) });
+            if (isSize(t)) res.push({ el, t, n: parseInt(t, 10) });
         }
         return res;
     }
@@ -192,21 +200,27 @@
         if (size.toUpperCase() === '1K') { sizeDoneFor = model; return; }
 
         sizeBusy = true;
-        sizeBtn().click();                                   // открыть выпадашку
-        setTimeout(() => {
+        const btn = sizeBtn();
+        const openedByUs = !sizeListOpen();
+        if (openedByUs) btn.click();                         // открыть окошко
+        let tries = 0;
+        const iv = setInterval(() => {
+            tries++;
             const opts = sizeOptions();
+            if (!opts.length && tries < 8) return;           // ждём, пока окошко появится
+            clearInterval(iv);
             if (opts.length) {
                 opts.sort((a, b) => a.n - b.n);
                 const min = opts[0];
-                if (min.t.toUpperCase() !== size.toUpperCase()) { (min.el.closest('button, li, [role="option"], div') || min.el).click(); log('поставил размер', min.t); }
-                else log('минимум уже стоит:', size);
+                if (!min.el.classList.contains('active')) { min.el.click(); log('поставил размер', min.t); }
+                else log('минимум уже стоит:', min.t);
             } else log('не нашёл варианты размера');
             sizeDoneFor = model;
             setTimeout(() => {
-                if (sizeOptions().length) closeMenu(sizeBtn());   // свернуть, только если ещё открыта
+                if (openedByUs && sizeListOpen()) closeMenu(btn);   // свернуть, только если открывали сами
                 sizeBusy = false;
-            }, 250);
-        }, 400);
+            }, 300);
+        }, 250);
     }
 
     function start() {
