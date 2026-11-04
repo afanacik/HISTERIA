@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Dzine — запрет платных моделей + GPT Image 2.0 + 1K по умолчанию
 // @namespace    klub-dzine
-// @version      1.5
-// @description  Если выбрана платная модель (Ideogram 4.5, Seedream 5.0 Flash, Nano Banana 2.1) — генерация не запускается, и скрипт сам переключает на GPT Image 2.0. При открытии Dzine сразу ставит GPT Image 2.0.
+// @version      1.6
+// @description  Если выбрана платная модель (Ideogram 4.5, Seedream 5.0 Flash, Nano Banana 2.1, FLUX.3) — генерация не запускается, и скрипт сам переключает на GPT Image 2.0. При открытии Dzine сразу ставит GPT Image 2.0.
 // @match        *://*.dzine.ai/*
 // @match        *://dzine.ai/*
 // @run-at       document-start
@@ -17,6 +17,7 @@
         'Ideogram 4.5',
         'Seedream 5.0 Flash',
         'Nano Banana 2.1',
+        'FLUX.3',
     ];
     const DEFAULT_MODEL = 'GPT Image 2.0';
     const DEBUG = true;          // логи в консоли с меткой [dzine models]
