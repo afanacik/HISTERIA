@@ -1,6 +1,7 @@
 'use strict';
 
-const DEFAULTS = { enabled: true, backgroundOnly: false, notify: false, sound: 'chime', volume: 70 };
+const DEFAULTS = { enabled: true, backgroundOnly: false, notify: false, markTab: true, sound: 'chime', volume: 70 };
+const EMPTY_STATS = { dings: 0, totalWaitMs: 0, longestMs: 0, day: '', today: 0 };
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
 
 const $ = (id) => document.getElementById(id);
@@ -8,6 +9,12 @@ const els = {
   enabled: $('enabled'),
   backgroundOnly: $('backgroundOnly'),
   notify: $('notify'),
+  markTab: $('markTab'),
+  statToday: $('statToday'),
+  statDings: $('statDings'),
+  statWait: $('statWait'),
+  statLongest: $('statLongest'),
+  resetStats: $('resetStats'),
   sound: $('sound'),
   volume: $('volume'),
   volumeValue: $('volumeValue'),
@@ -37,6 +44,7 @@ async function initialize() {
   els.enabled.checked = Boolean(settings.enabled);
   els.backgroundOnly.checked = Boolean(settings.backgroundOnly);
   els.notify.checked = Boolean(settings.notify);
+  els.markTab.checked = Boolean(settings.markTab);
   els.sound.value = settings.sound;
   els.volume.value = settings.volume;
   els.volumeValue.textContent = `${els.volume.value}%`;
@@ -74,6 +82,36 @@ async function checkCurrentTab() {
 els.enabled.addEventListener('change', () => save({ enabled: els.enabled.checked }));
 els.backgroundOnly.addEventListener('change', () => save({ backgroundOnly: els.backgroundOnly.checked }));
 els.notify.addEventListener('change', () => save({ notify: els.notify.checked }));
+els.markTab.addEventListener('change', () => save({ markTab: els.markTab.checked }));
+
+function formatDuration(ms) {
+  const totalMin = Math.round(ms / 60000);
+  if (ms < 60000) return `${Math.round(ms / 1000)} с`;
+  if (totalMin < 60) return `${totalMin} мин`;
+  const h = Math.floor(totalMin / 60);
+  return `${h} ч ${totalMin % 60} мин`;
+}
+
+function localDay() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function renderStats(stats) {
+  const s = { ...EMPTY_STATS, ...(stats || {}) };
+  els.statToday.textContent = s.day === localDay() ? s.today : 0;
+  els.statDings.textContent = s.dings;
+  els.statWait.textContent = s.totalWaitMs ? formatDuration(s.totalWaitMs) : '0 мин';
+  els.statLongest.textContent = s.longestMs ? formatDuration(s.longestMs) : '—';
+}
+
+chrome.storage.local.get({ stats: EMPTY_STATS }).then(({ stats }) => renderStats(stats));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.stats) renderStats(changes.stats.newValue);
+});
+els.resetStats.addEventListener('click', () => {
+  if (confirm('Обнулить статистику?')) save({ stats: EMPTY_STATS });
+});
 els.sound.addEventListener('change', () => {
   showCustomBox();
   save({ sound: els.sound.value });

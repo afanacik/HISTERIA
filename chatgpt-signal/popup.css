@@ -63,6 +63,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .tab-status.warn { background: var(--warn-bg); color: var(--warn); }
 .privacy { margin: 4px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
 
+.stats { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; padding: 10px 6px 8px; border-radius: 9px; background: var(--chip); text-align: center; }
+.stats b { display: block; font-size: 15px; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stats span { display: block; margin-top: 2px; font-size: 9.5px; color: var(--muted); line-height: 1.2; }
+button.link { position: absolute; right: 6px; top: -17px; width: auto; padding: 0; background: none; color: var(--muted); font-size: 10px; font-weight: 400; text-decoration: underline; }
+button.link:hover { background: none; color: var(--fg); }
 .journal { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
 .journal summary { cursor: pointer; list-style: none; }
 .journal summary::-webkit-details-marker { display: none; }

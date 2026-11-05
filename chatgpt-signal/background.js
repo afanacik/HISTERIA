@@ -4,6 +4,7 @@ const DEFAULTS = {
   enabled: true,
   backgroundOnly: false,
   notify: false,
+  markTab: true,
   sound: 'chime',
   volume: 70
 };
@@ -114,8 +115,12 @@ chrome.notifications.onClicked.addListener(async (id) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener((details) => {
-  addLog(`Расширение ${details.reason === 'install' ? 'установлено' : 'обновлено'} (v${chrome.runtime.getManifest().version}). Обновите вкладки ChatGPT (F5).`);
+chrome.runtime.onInstalled.addListener(async (details) => {
+  const what = details.reason === 'install' ? 'установлено' : 'обновлено';
+  addLog(`Расширение ${what} (v${chrome.runtime.getManifest().version})`);
+  updateBadge().catch(() => {});
+  const connected = await injectIntoOpenTabs().catch(() => 0);
+  if (connected) addLog(`Подключено к открытым вкладкам ChatGPT: ${connected} (обновлять не нужно)`);
 });
 
 chrome.notifications.onClosed.addListener((id) => {
@@ -151,7 +156,8 @@ async function handleAnswerFinished(message, sender) {
     return { ok: true, skipped: 'foreground' };
   }
 
-  if (settings.notify) {
+  recordStats(message.waitedMs).catch(() => {});
+  if (settings.notify && message.inBackground) {
     showNotification(sender.tab).catch((e) => addLog(`Уведомление не показано: ${errorText(e)}`));
   }
   try {
@@ -177,6 +183,66 @@ async function handleTest(message) {
     await showNotification(null).catch((e) => addLog(`Уведомление не показано: ${errorText(e)}`));
   }
   return { ok: true };
+}
+
+// ---------- Статистика (только локально) ----------
+
+const EMPTY_STATS = { dings: 0, totalWaitMs: 0, longestMs: 0, day: '', today: 0 };
+let statsChain = Promise.resolve();
+
+function localDay() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function recordStats(waitedMs) {
+  const wait = Math.max(0, Math.min(Number(waitedMs) || 0, 6 * 60 * 60 * 1000));
+  statsChain = statsChain.then(async () => {
+    const { stats } = await chrome.storage.local.get({ stats: EMPTY_STATS });
+    const day = localDay();
+    const next = {
+      dings: stats.dings + 1,
+      totalWaitMs: stats.totalWaitMs + wait,
+      longestMs: Math.max(stats.longestMs, wait),
+      day,
+      today: stats.day === day ? stats.today + 1 : 1
+    };
+    await chrome.storage.local.set({ stats: next });
+  }).catch(() => {});
+  return statsChain;
+}
+
+// ---------- Значок расширения: «OFF», когда сигнал выключен ----------
+
+async function updateBadge() {
+  const { enabled } = await chrome.storage.local.get({ enabled: true });
+  await chrome.action.setBadgeBackgroundColor({ color: '#8a8a8a' });
+  await chrome.action.setBadgeText({ text: enabled ? '' : 'OFF' });
+  await chrome.action.setTitle({ title: enabled ? 'Мой сигнал для ChatGPT' : 'Мой сигнал: выключен' });
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.enabled) updateBadge().catch(() => {});
+});
+chrome.runtime.onStartup.addListener(() => { updateBadge().catch(() => {}); });
+
+// ---------- Подключение к уже открытым вкладкам ----------
+// Без этого после установки/обновления пришлось бы обновлять ChatGPT (F5).
+
+async function injectIntoOpenTabs() {
+  const tabs = await chrome.tabs.query({ url: ['https://chatgpt.com/*', 'https://chat.openai.com/*'] });
+  let connected = 0;
+  for (const tab of tabs) {
+    if (typeof tab.id !== 'number' || tab.discarded) continue;
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['page-hook.js'], world: 'MAIN' });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['sounds.js', 'content.js'] });
+      connected++;
+    } catch (_) {
+      // Вкладка ещё грузится или закрыта — подключится сама при загрузке.
+    }
+  }
+  return connected;
 }
 
 function errorText(error) {

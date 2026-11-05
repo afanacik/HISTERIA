@@ -1,13 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Мой сигнал для ChatGPT",
-  "version": "2.1.0",
-  "description": "Личный звуковой сигнал (и уведомление), когда ChatGPT закончил отвечать.",
+  "version": "2.2.0",
+  "description": "Личный звуковой сигнал, отметка на вкладке и уведомление, когда ChatGPT закончил отвечать.",
   "minimum_chrome_version": "116",
   "permissions": [
     "offscreen",
     "storage",
-    "notifications"
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
   ],
   "background": {
     "service_worker": "background.js"

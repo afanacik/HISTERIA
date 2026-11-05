@@ -8,6 +8,12 @@
 (() => {
   'use strict';
 
+  // После обновления расширения скрипт заново внедряется в открытые вкладки.
+  // Старая копия теряет связь с расширением — убираем её следы.
+  const previous = globalThis.__myGptSignalInstance;
+  if (previous && previous.alive()) return;
+  if (previous) previous.teardown();
+
   const SOURCE = 'my-gpt-signal';
   const QUIET_MS = 1500;            // тишина после потока/кнопки до сигнала
   const DOM_CHECK_THROTTLE_MS = 300;
@@ -48,6 +54,118 @@
   let activityTimer = null;
   let domCheckTimer = null;
 
+  const cleanups = [];
+  function listen(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    cleanups.push(() => target.removeEventListener(type, handler, options));
+  }
+  function contextAlive() {
+    try {
+      return Boolean(chrome.runtime && chrome.runtime.id);
+    } catch (_) {
+      return false;
+    }
+  }
+  function teardown() {
+    while (cleanups.length) {
+      try { cleanups.pop()(); } catch (_) { /* ignore */ }
+    }
+    clearTabMark();
+  }
+  globalThis.__myGptSignalInstance = { alive: contextAlive, teardown };
+
+  // ---------- Отметка на вкладке ----------
+  // Когда ответ готов, а вы смотрите в другое место, значок вкладки
+  // меняется на зелёный кружок с галочкой (без значка — «✅» в заголовке).
+  // Всё возвращается, как только вы откроете вкладку.
+  //
+  // Узлы страницы не создаются и не удаляются (ChatGPT — React-приложение,
+  // это может его сломать): меняются только текст заголовка и атрибут href
+  // у существующих <link rel="icon">.
+  const TITLE_MARK = '✅ ';
+  let markIcon = null;
+  let tabMarked = false;
+  let headObserver = null;
+  const iconOriginals = new Map();
+
+  function drawMarkIcon() {
+    if (markIcon) return markIcon;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const g = canvas.getContext('2d');
+    g.fillStyle = '#141826';
+    g.beginPath(); g.arc(32, 32, 31, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#22c55e';
+    g.beginPath(); g.arc(32, 32, 26, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 7;
+    g.lineCap = g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(19, 33); g.lineTo(28, 42); g.lineTo(46, 23); g.stroke();
+    markIcon = canvas.toDataURL('image/png');
+    return markIcon;
+  }
+
+  function titleTextNode() {
+    const node = document.querySelector('head > title');
+    return node && node.firstChild && node.firstChild.nodeType === Node.TEXT_NODE ? node.firstChild : null;
+  }
+
+  function iconLinks() {
+    return [...document.querySelectorAll('head > link[rel~="icon"]')];
+  }
+
+  function applyTabMark() {
+    const icon = drawMarkIcon();
+    const links = iconLinks();
+    // «✅» в заголовке — только если у страницы нет значка, чтобы не было двух галочек.
+    const text = links.length ? null : titleTextNode();
+    if (text && !text.nodeValue.startsWith(TITLE_MARK)) text.nodeValue = TITLE_MARK + text.nodeValue;
+    for (const link of links) {
+      if (link.getAttribute('href') === icon) continue;
+      if (!iconOriginals.has(link)) {
+        iconOriginals.set(link, { href: link.getAttribute('href'), type: link.getAttribute('type') });
+      }
+      link.setAttribute('href', icon);
+      if (link.hasAttribute('type')) link.setAttribute('type', 'image/png');
+    }
+  }
+
+  function markTab() {
+    if (tabMarked || !document.head) return;
+    tabMarked = true;
+    applyTabMark();
+    // ChatGPT может сменить значок или заголовок (название чата) — возвращаем отметку.
+    headObserver = new MutationObserver(() => { if (tabMarked) applyTabMark(); });
+    headObserver.observe(document.head, {
+      childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href']
+    });
+  }
+
+  function clearTabMark() {
+    if (!tabMarked) return;
+    tabMarked = false;
+    if (headObserver) headObserver.disconnect();
+    headObserver = null;
+    const text = titleTextNode();
+    if (text && text.nodeValue.startsWith(TITLE_MARK)) text.nodeValue = text.nodeValue.slice(TITLE_MARK.length);
+    for (const [link, original] of iconOriginals) {
+      if (link.getAttribute('href') !== markIcon) continue;
+      if (typeof original.href === 'string') link.setAttribute('href', original.href);
+      if (typeof original.type === 'string') link.setAttribute('type', original.type);
+      else link.removeAttribute('type');
+    }
+    iconOriginals.clear();
+  }
+
+  function tabUnseen() {
+    return document.visibilityState !== 'visible' || !document.hasFocus();
+  }
+
+  listen(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'visible' && document.hasFocus()) clearTabMark();
+  });
+  listen(window, 'focus', clearTabMark);
+
   // ---------- Журнал ----------
 
   function log(text) {
@@ -67,7 +185,9 @@
       sawDom: false,
       lastStream: null,
       userStopped: false,
-      activity: false
+      activity: false,
+      // Ожидание считаем от момента отправки, если она была только что.
+      sentAt: lastSubmit && Date.now() - lastSubmit < SUBMIT_WINDOW_MS ? lastSubmit : 0
     };
     log(`Начался ответ (${reason})`);
     return session;
@@ -114,8 +234,9 @@
     if (done.sawStream && done.lastStream !== 'done' && !done.sawDom) {
       return log('Поток ответа оборван — без сигнала');
     }
-    log(`Ответ готов (${how}) → сигнал`);
-    ring();
+    const waitedMs = Date.now() - (done.sentAt || done.started);
+    log(`Ответ готов (${how}, ${Math.round(waitedMs / 1000)} с) → сигнал`);
+    ring(waitedMs);
   }
 
   // Вызывается при каждом изменении признаков потока/кнопки.
@@ -152,11 +273,18 @@
     }
   }
 
-  async function ring() {
-    const inBackground = document.visibilityState === 'hidden' || !document.hasFocus();
+  async function ring(waitedMs) {
+    const inBackground = tabUnseen();
+    // Отметка на вкладке ставится первой — она нужна, даже если звук не сыграет.
+    if (inBackground) {
+      try {
+        const { enabled, markTab: mark } = await chrome.storage.local.get({ enabled: true, markTab: true });
+        if (enabled && mark) markTab();
+      } catch (_) { /* расширение перезагружено */ }
+    }
     let result;
     try {
-      result = await chrome.runtime.sendMessage({ type: 'ANSWER_FINISHED', inBackground });
+      result = await chrome.runtime.sendMessage({ type: 'ANSWER_FINISHED', inBackground, waitedMs });
     } catch (error) {
       const text = String(error && error.message || error);
       if (/context invalidated/i.test(text)) return; // расширение обновлено — нужна F5
@@ -168,8 +296,9 @@
 
   // ---------- 1. Сетевой поток ----------
 
-  window.addEventListener('message', (event) => {
+  listen(window, 'message', (event) => {
     if (event.source !== window) return;
+    if (!contextAlive()) return teardown();
     const data = event.data;
     if (!data || data.source !== SOURCE || typeof data.type !== 'string') return;
 
@@ -247,10 +376,13 @@
     activityTimer = setTimeout(activityCheck, ACTIVITY_QUIET_MS);
   }
 
-  new MutationObserver((mutations) => {
+  const pageObserver = new MutationObserver((mutations) => {
+    if (!contextAlive()) return teardown();
     scheduleDomCheck();
     noteActivity(mutations);
-  }).observe(document, {
+  });
+  cleanups.push(() => pageObserver.disconnect());
+  pageObserver.observe(document, {
     childList: true,
     subtree: true,
     characterData: true,
@@ -272,7 +404,7 @@
     }, 1200);
   }
 
-  document.addEventListener('keydown', (event) => {
+  listen(document, 'keydown', (event) => {
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
     const target = event.target instanceof Element ? event.target : null;
     if (target && target.closest('#prompt-textarea, [contenteditable="true"], textarea') &&
@@ -281,7 +413,7 @@
     }
   }, true);
 
-  document.addEventListener('click', (event) => {
+  listen(document, 'click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const button = target && target.closest('button, [role="button"]');
     if (!button) return;
@@ -295,7 +427,9 @@
 
   // Окно расширения спрашивает, подключена ли вкладка.
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== 'PING_TAB' || sender.id !== chrome.runtime.id) return;
+    if (!message || sender.id !== chrome.runtime.id) return;
+    if (message.type === 'CLEAR_TAB_MARK') return clearTabMark();
+    if (message.type !== 'PING_TAB') return;
     sendResponse({ ok: true, generating: isBusy() || Boolean(session) });
   });
 

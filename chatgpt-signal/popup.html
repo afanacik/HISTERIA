@@ -29,7 +29,12 @@
     </label>
 
     <label class="setting">
-      <span><strong>Уведомление Windows/macOS</strong><small>Всплывающее окно; клик — открыть вкладку</small></span>
+      <span><strong>Отмечать вкладку</strong><small>Зелёная галочка на вкладке, пока вы её не откроете</small></span>
+      <input id="markTab" type="checkbox">
+    </label>
+
+    <label class="setting">
+      <span><strong>Уведомление Windows/macOS</strong><small>Когда вы не смотрите на ChatGPT; клик — открыть вкладку</small></span>
       <input id="notify" type="checkbox">
     </label>
 
@@ -57,6 +62,14 @@
 
     <button id="testSound" type="button">Проверить звук</button>
     <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <section class="stats" aria-label="Статистика">
+      <div><b id="statToday">0</b><span>сегодня</span></div>
+      <div><b id="statDings">0</b><span>всего ответов</span></div>
+      <div><b id="statWait">0 мин</b><span>ждали всего</span></div>
+      <div><b id="statLongest">—</b><span>самый долгий</span></div>
+      <button id="resetStats" type="button" class="link" title="Обнулить статистику">обнулить</button>
+    </section>
 
     <details id="journal" class="journal">
       <summary><strong>Журнал событий</strong><small>Что расширение видело на странице</small></summary>
