@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="popup.css">
+  <title>Мой сигнал для ChatGPT</title>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icons/icon48.png" alt="" width="44" height="44">
+      <div>
+        <h1>Мой сигнал</h1>
+        <p class="subtitle">Звук, когда ChatGPT ответил</p>
+      </div>
+    </header>
+
+    <p id="tabStatus" class="tab-status" role="status" aria-live="polite">Проверяю вкладку…</p>
+
+    <label class="setting">
+      <span><strong>Сигнал включён</strong><small>Звук, когда ответ готов</small></span>
+      <input id="enabled" type="checkbox">
+    </label>
+
+    <label class="setting">
+      <span><strong>Только в фоне</strong><small>Молчать, если я и так смотрю на ChatGPT</small></span>
+      <input id="backgroundOnly" type="checkbox">
+    </label>
+
+    <label class="setting">
+      <span><strong>Уведомление Windows/macOS</strong><small>Всплывающее окно; клик — открыть вкладку</small></span>
+      <input id="notify" type="checkbox">
+    </label>
+
+    <div class="field">
+      <label for="sound"><strong>Звук</strong></label>
+      <select id="sound">
+        <option value="chime">Колокольчик</option>
+        <option value="ding">Дзынь</option>
+        <option value="soft">Мягкий аккорд</option>
+        <option value="triple">Три бипа</option>
+        <option value="coin">Монетка</option>
+        <option value="custom">Свой файл…</option>
+      </select>
+    </div>
+
+    <div id="customBox" class="field custom" hidden>
+      <input id="customFile" type="file" accept="audio/*">
+      <small id="customName">Файл не выбран (mp3, wav, ogg — до 3 МБ)</small>
+    </div>
+
+    <label class="field" for="volume">
+      <span class="row"><strong>Громкость</strong><output id="volumeValue" for="volume">70%</output></span>
+      <input id="volume" type="range" min="0" max="100" step="5" value="70">
+    </label>
+
+    <button id="testSound" type="button">Проверить звук</button>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <p class="privacy">Работает локально. Текст переписки не читается, не сохраняется и не отправляется.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

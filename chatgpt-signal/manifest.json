@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Мой сигнал для ChatGPT",
+  "version": "2.0.0",
+  "description": "Личный звуковой сигнал (и уведомление), когда ChatGPT закончил отвечать.",
+  "minimum_chrome_version": "116",
+  "permissions": ["offscreen", "storage", "notifications"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Мой сигнал для ChatGPT",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self' data: blob:; object-src 'none'; connect-src 'none'"
+  }
+}
