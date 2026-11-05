@@ -287,7 +287,7 @@ const SYSTEM_PROMPTS = {
 
 // Версия фонового скрипта. Попап сверяет её с манифестом: если после замены файлов
 // не нажали ↻ в chrome://extensions, Chrome может держать старый фон, и выбор модели не действует.
-const KIT_BUILD = '2.6.0';
+const KIT_BUILD = '2.6.1';
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;

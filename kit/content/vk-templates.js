@@ -494,13 +494,13 @@
   function renderMain() {
     return `
       <div class="vk-tabs">
-        ${GROUPS.map(g => `<button class="vk-tab" data-gid="${g.id}" title="${escapeHtml(g.name)}" style="${tabInline(g, g.id === activeGid)}">${escapeHtml(g.name)}</button>`).join('')}
+        ${GROUPS.map(g => `<button class="vk-tab" data-gid="${escapeHtml(g.id)}" title="${escapeHtml(g.name)}" style="${tabInline(g, g.id === activeGid)}">${escapeHtml(g.name)}</button>`).join('')}
         <button class="vk-tab vk-tab-svc" id="vk-tab-add" title="Добавить группу">+</button>
         <button class="vk-tab vk-tab-svc" id="vk-tab-manage" title="Управление группами (переименовать, цвет, порядок, удалить)">✎</button>
       </div>
       <div class="vk-tpl-list">
         ${ITEMS.filter(it => it.gid === activeGid).map(it => `
-          <div class="vk-tpl-item" data-id="${it.id}" draggable="true">
+          <div class="vk-tpl-item" data-id="${escapeHtml(it.id)}" draggable="true">
             <span class="vk-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
             <div style="min-width:0">
               <div class="nm">${escapeHtml(it.name || 'Без названия')}${(it.files && it.files.length) ? ` <span class="vk-clip" title="${escapeHtml(it.files.map(f => f.name).join(', '))}">📎${it.files.length}</span>` : ''}</div>
@@ -518,7 +518,7 @@
         <input class="vk-tpl-input" id="vk-tpl-name" placeholder="Название">
         <textarea class="vk-tpl-text" id="vk-tpl-text" placeholder="Текст шаблона"></textarea>
         <select class="vk-tpl-input" id="vk-tpl-group" title="Группа шаблона">
-          ${GROUPS.map(g => `<option value="${g.id}" ${g.id === activeGid ? 'selected' : ''}>Группа: ${escapeHtml(g.name)}</option>`).join('')}
+          ${GROUPS.map(g => `<option value="${escapeHtml(g.id)}" ${g.id === activeGid ? 'selected' : ''}>Группа: ${escapeHtml(g.name)}</option>`).join('')}
         </select>
         <div class="vk-vars">
           ${VARS.map(v => `<button class="vk-var" data-v="{${v}}">${v}</button>`).join('')}
@@ -537,9 +537,9 @@
         <p class="vk-sec-title">Группы</p>
         <p class="vk-hint">Название и цвет сохраняются сами. Порядок — перетаскиванием за ⠿. Цифра — сколько шаблонов в группе.</p>
         ${GROUPS.map(g => `
-          <div class="vk-grp" data-gid="${g.id}">
+          <div class="vk-grp" data-gid="${escapeHtml(g.id)}">
             <span class="vk-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
-            <input type="color" class="g-color" value="${g.color}" title="Цвет группы">
+            <input type="color" class="g-color" value="${escapeHtml(g.color)}" title="Цвет группы">
             <input class="vk-tpl-input g-name" value="${escapeHtml(g.name)}" placeholder="Название группы">
             <span class="g-count">${ITEMS.filter(it => it.gid === g.id).length}</span>
             <button class="b-del g-del" title="Удалить группу">✕</button>
@@ -662,7 +662,7 @@
     function renderFiles() {
       filesBox.innerHTML = editFiles.map((f, i) => `
         <div class="vk-file" title="${escapeHtml(f.name)}">
-          ${(f.data && /^image\//.test(f.type)) ? `<img src="${f.data}" alt="">` : `<span class="fi">${fileIcon(f.type)}</span>`}
+          ${(f.data && /^image\//.test(f.type) && /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+\/=]+$/i.test(f.data)) ? `<img src="${f.data}" alt="">` : `<span class="fi">${fileIcon(f.type)}</span>`}
           <span><div class="fn">${escapeHtml(f.name)}</div><div class="fs">${fmtSize(f.size || 0)}</div></span>
           <button class="fx" data-i="${i}" title="Убрать">✕</button>
         </div>`).join('');

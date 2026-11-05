@@ -231,6 +231,12 @@
     return (m10===1&&m100!==11)?forms[0]:([2,3,4].includes(m10)&&![12,13,14].includes(m100))?forms[1]:forms[2];
   }
 
+  // Всё, что пришло от ИИ или из ответа сервера, вставляем только как текст:
+  // в «changes» модель может вернуть что угодно, в том числе HTML со скриптом.
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
   function toast(html, ttl = 3000) {
     document.getElementById('gf-toast')?.remove();
     const t = document.createElement('div');
@@ -246,11 +252,11 @@
   }
 
   function toastError(msg) {
-    toast(`<div style="display:flex;gap:8px;align-items:center;"><span style="font-size:16px">⚠️</span><div><b style="color:#fca5a5">Ошибка ГрамФикс</b><div style="color:#9090bb;font-size:11px;margin-top:2px">${msg}</div></div></div>`, 2500);
+    toast(`<div style="display:flex;gap:8px;align-items:center;"><span style="font-size:16px">⚠️</span><div><b style="color:#fca5a5">Ошибка ГрамФикс</b><div style="color:#9090bb;font-size:11px;margin-top:2px">${escHtml(msg)}</div></div></div>`, 2500);
   }
 
   function toastChangesList(changes) {
-    const list = changes.slice(0,4).map(c=>`<div style="color:#9090cc;font-size:11px;margin-top:3px">• ${c}</div>`).join('');
+    const list = changes.slice(0,4).map(c=>`<div style="color:#9090cc;font-size:11px;margin-top:3px">• ${escHtml(c)}</div>`).join('');
     const more = changes.length>4 ? `<div style="color:#6060aa;font-size:11px;margin-top:2px">ещё ${changes.length-4}...</div>` : '';
     return list + more;
   }
@@ -470,7 +476,7 @@
 
   function armAuto(root) {
     if (!settings.autoPause || !settings.enabled || !hasActiveKey()) return;
-    if (!root || !wrap || isBusy || autoOff) return;
+    if (!root || !wrap || isBusy || autoOff || !userTyped) return;
 
     const txt = getText(root).trim();
     // короткий текст или уже проверенный — отсчёт не нужен
@@ -563,12 +569,17 @@
 
   // Текст поля на момент входа в него — чтобы понять, правил ли пользователь
   let textOnFocus = '';
+  // Печатал ли в этом поле сам пользователь (настоящие нажатия, а не события,
+  // которые сайт может сгенерировать скриптом). Без этого автоисправление не
+  // срабатывает: иначе сайт мог бы сам подсунуть текст и тратить твой API.
+  let userTyped = false;
 
   // Фокус — сохранить активный элемент и исходный текст
   document.addEventListener('focusin', (e) => {
     if (isEditable(e.target)) {
       activeEl = getRoot(e.target) || e.target;
       textOnFocus = getText(activeEl);
+      userTyped = false;
       autoOff = false;   // новое поле — автоправка снова разрешена
     }
   }, true);
@@ -581,12 +592,14 @@
 
   // Печать — показать меню
   document.addEventListener('input', (e) => {
-    if (isEditable(e.target)) onTyping(e.target);
+    if (!e.isTrusted) return;   // событие сгенерировал сайт, а не пользователь
+    if (isEditable(e.target)) { userTyped = true; onTyping(e.target); }
   }, true);
 
   document.addEventListener('keyup', (e) => {
+    if (!e.isTrusted) return;
     if (!['Shift','Control','Alt','Meta','CapsLock','Tab','Escape'].includes(e.key)) {
-      if (isEditable(e.target)) onTyping(e.target);
+      if (isEditable(e.target)) { userTyped = true; onTyping(e.target); }
     }
   }, true);
 
@@ -595,7 +608,7 @@
     if (!isEditable(e.target)) return;
     const el = getRoot(e.target) || e.target;
     const textAtBlur = getText(el);
-    const edited = textAtBlur.trim() !== (textOnFocus || '').trim();
+    const edited = userTyped && textAtBlur.trim() !== (textOnFocus || '').trim();
     const wasCounting = !!autoTimer;
     cancelAuto(false);   // отсчёт не должен сработать вдогонку по покинутому полю
 

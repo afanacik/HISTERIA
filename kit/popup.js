@@ -672,6 +672,20 @@ $('expBtn').addEventListener('click', async () => {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 });
 
+// Что можно восстановить из бэкапа: имя → ожидаемый тип значения.
+const IMPORT_MODULES = {
+  modTemplates: 'boolean', modStealth: 'boolean', stealthOn: 'boolean', onlineOn: 'boolean',
+  typingOn: 'boolean', onlineRe: 'string', vkfixEnabled: 'boolean', vkfixFrom: 'string', vkfixTo: 'string'
+};
+const IMPORT_GRAMFIX = {
+  enabled: 'boolean', showDiff: 'boolean', autoFix: 'boolean', autoPause: 'boolean', autoDelay: 'number',
+  fixCount: 'number', gfModel: 'string', gfProvider: 'string', gfOpenaiModel: 'string'
+};
+const IMPORT_GPT = {
+  gptEnabled: 'boolean', gptBackgroundOnly: 'boolean', gptNotify: 'boolean', gptMarkTab: 'boolean',
+  gptSound: 'string', gptVolume: 'number', gptCustomSound: 'object', gptStats: 'object'
+};
+
 $('impBtn').addEventListener('click', () => $('impFile').click());
 $('impFile').addEventListener('change', () => {
   const f = $('impFile').files[0];
@@ -686,9 +700,22 @@ $('impFile').addEventListener('change', () => {
     if (Array.isArray(obj.items))  upd.items  = obj.items;
     if (Array.isArray(obj.groups)) upd.groups = obj.groups;
     if (obj.settings && typeof obj.settings === 'object') upd.settings = obj.settings;
-    if (obj.modules && typeof obj.modules === 'object') Object.assign(upd, obj.modules);
+    // Из файла берём только известные настройки нужного типа. API-ключи и
+    // всё незнакомое игнорируем: подсунутый «бэкап» не должен подменить ключ
+    // (тогда твои тексты уходили бы в чужой аккаунт) или что-то ещё.
+    if (obj.modules && typeof obj.modules === 'object') {
+      for (const [k, type] of Object.entries(IMPORT_MODULES)) {
+        if (typeof obj.modules[k] === type) upd[k] = obj.modules[k];
+      }
+      if (typeof upd.vkfixFrom === 'string' && !/^\d{1,4}$/.test(upd.vkfixFrom)) delete upd.vkfixFrom;
+      if (typeof upd.vkfixTo === 'string' && !/^[a-z0-9][a-z0-9.-]*\.vk\.(ru|com)$/i.test(upd.vkfixTo)) delete upd.vkfixTo;
+    }
     if (obj.gpt && typeof obj.gpt === 'object') {
-      Object.keys(obj.gpt).forEach(k => { if (k.startsWith('gpt') && obj.gpt[k] !== null) upd[k] = obj.gpt[k]; });
+      for (const [k, type] of Object.entries(IMPORT_GPT)) {
+        if (typeof obj.gpt[k] === type && obj.gpt[k] !== null) upd[k] = obj.gpt[k];
+      }
+      const cs = upd.gptCustomSound;
+      if (cs && !(typeof cs.name === 'string' && typeof cs.dataUrl === 'string' && /^data:audio\//.test(cs.dataUrl))) delete upd.gptCustomSound;
     }
     if (obj.files && typeof obj.files === 'object') {
       Object.keys(obj.files).forEach(k => { if (k.startsWith('tplFile:') && obj.files[k] && obj.files[k].data) upd[k] = obj.files[k]; });
@@ -697,7 +724,13 @@ $('impFile').addEventListener('change', () => {
     if (!Object.keys(upd).length) { alert('В файле нет знакомых данных.'); return; }
 
     await chrome.storage.local.set(upd);
-    if (obj.gramfix && typeof obj.gramfix === 'object') await chrome.storage.sync.set(obj.gramfix);
+    if (obj.gramfix && typeof obj.gramfix === 'object') {
+      const gf = {};
+      for (const [k, type] of Object.entries(IMPORT_GRAMFIX)) {
+        if (typeof obj.gramfix[k] === type) gf[k] = obj.gramfix[k];
+      }
+      if (Object.keys(gf).length) await chrome.storage.sync.set(gf);
+    }
 
     await load();
     alert('Импортировано: шаблонов — ' + (upd.items ? upd.items.length : 0) +
