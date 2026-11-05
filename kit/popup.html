@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Кит</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080812;
+    --s1: #10101f;
+    --s2: #18182e;
+    --s3: #20203a;
+    --border: #282848;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --text: #eeeeff;
+    --muted: #6868a0;
+    --ok: #4ade80;
+    --err: #f87171;
+    --warn: #fbbf24;
+  }
+
+  body {
+    width: 358px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+  }
+
+  /* ---------- шапка ---------- */
+  .hdr {
+    padding: 14px 18px 12px;
+    background: linear-gradient(160deg, #18104a 0%, #0c0c20 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 11px;
+    position: relative; overflow: hidden;
+  }
+  .hdr::after {
+    content: ''; position: absolute; top: -60px; right: -60px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(108,99,255,.18) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .hdr img { width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; }
+  .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .2px; }
+  .brand-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* ---------- вкладки ---------- */
+  .tabs { display: flex; background: var(--s1); border-bottom: 1px solid var(--border); }
+  .tab {
+    flex: 1; position: relative; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-family: inherit; font-size: 10px; font-weight: 600;
+    padding: 9px 2px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+  }
+  .tab span.ico { font-size: 15px; line-height: 1; }
+  .tab:hover { color: #9c9ccc; }
+  .tab.on { color: var(--accent2); border-bottom-color: var(--accent); background: rgba(108,99,255,.07); }
+  .tab .dot-off {
+    position: absolute; top: 7px; right: 12px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--err);
+  }
+
+  .pane { display: none; padding: 14px 18px 16px; }
+  .pane.on { display: block; }
+
+  /* ---------- общие элементы ---------- */
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid rgba(40,40,72,.6);
+  }
+  .row:last-child { border-bottom: none; }
+  .row-name { font-size: 12px; font-weight: 600; }
+  .row-desc { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+
+  .blk-title {
+    font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+    margin: 12px 0 7px; display: flex; align-items: center; gap: 6px;
+  }
+  .blk-title:first-child { margin-top: 0; }
+
+  label.sw { position: relative; width: 44px; height: 24px; cursor: pointer; flex-shrink: 0; }
+  label.sw input { display: none; }
+  .sw-trk {
+    position: absolute; inset: 0; background: var(--s3); border-radius: 12px;
+    border: 1px solid var(--border); transition: background .2s, border-color .2s;
+  }
+  .sw-dot {
+    position: absolute; top: 4px; left: 4px; width: 14px; height: 14px;
+    background: var(--muted); border-radius: 50%; transition: transform .2s, background .2s;
+  }
+  label.sw input:checked ~ .sw-trk { background: rgba(108,99,255,.25); border-color: var(--accent); }
+  label.sw input:checked ~ .sw-dot { transform: translateX(20px); background: var(--accent2); }
+
+  input[type="text"], input[type="password"] {
+    width: 100%; background: var(--s2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: inherit; font-size: 12px; padding: 8px 10px;
+    outline: none; transition: border-color .2s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  select {
+    width: 100%; background-color: var(--s2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: inherit; font-size: 12px; padding: 8px 30px 8px 10px;
+    outline: none; cursor: pointer; transition: border-color .2s;
+    -webkit-appearance: none; appearance: none; color-scheme: dark;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a78bfa' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 11px center;
+  }
+  select:hover, select:focus { border-color: var(--accent); }
+  select option { background: var(--s2); color: var(--text); }
+
+  .btn {
+    background: linear-gradient(135deg, var(--accent), #5b52e0); color: #fff; border: none;
+    border-radius: 8px; padding: 8px 14px; font-size: 12px; font-weight: 600;
+    font-family: inherit; cursor: pointer; transition: transform .15s, box-shadow .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(108,99,255,.4); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn.wide { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; }
+  .btn.ghost { background: var(--s2); border: 1px solid var(--border); color: #b9b9dd; }
+  .btn.ghost:hover { box-shadow: none; border-color: var(--accent); }
+
+  .field-row { display: flex; gap: 8px; }
+  .status { margin-top: 7px; font-size: 11px; display: flex; align-items: center; gap: 6px; min-height: 16px; line-height: 1.4; }
+  #modelStatus:empty, #gptTab:empty { display: none; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot.ok { background: var(--ok); } .dot.err { background: var(--err); } .dot.warn { background: var(--warn); }
+
+  .hint { margin-top: 7px; font-size: 10px; color: var(--muted); line-height: 1.55; }
+  .hint a { color: var(--accent2); text-decoration: none; }
+  .hint a:hover { text-decoration: underline; }
+
+  kbd {
+    background: var(--s2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 3px 7px; font-size: 10px; font-family: monospace; color: var(--accent2);
+  }
+
+  .stat-num {
+    font-size: 26px; font-weight: 700; line-height: 1;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* ползунок задержки */
+  .range-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 0 8px; transition: opacity .2s;
+  }
+  .range-row.off { opacity: .35; pointer-events: none; }
+  .range-lbl { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .range-val {
+    font-size: 11px; font-weight: 700; color: var(--accent2);
+    min-width: 34px; text-align: right; flex-shrink: 0;
+  }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    flex: 1; height: 4px; border-radius: 2px; padding: 0;
+    background: var(--s3); border: none; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent2); cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(108,99,255,.25);
+  }
+
+  #diagOut { margin-top: 10px; display: none; }
+  #diagOut.on { display: block; }
+  .diag-line {
+    font-size: 11px; line-height: 1.5; padding: 6px 9px; margin-bottom: 5px;
+    background: var(--s2); border: 1px solid var(--border); border-radius: 7px;
+    word-break: break-all;
+  }
+  .diag-line b { font-weight: 600; }
+  .diag-ok { color: var(--ok); } .diag-err { color: var(--err); } .diag-warn { color: var(--warn); }
+  .diag-url { color: var(--muted); font-size: 10px; display: block; margin-top: 2px; }
+
+  /* ---------- Сигнал ChatGPT ---------- */
+  .gpt-stats { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    margin-top: 12px; padding: 10px 4px 8px; background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; text-align: center; }
+  .gpt-stats b { display: block; font-size: 15px; color: var(--accent2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gpt-stats span { display: block; margin-top: 2px; font-size: 9px; color: var(--muted); line-height: 1.2; }
+  .linkbtn { background: none; border: none; color: var(--muted); font: inherit; font-size: 10px;
+    text-decoration: underline; cursor: pointer; padding: 0; }
+  .linkbtn:hover { color: var(--text); }
+  #gptCustomBox[hidden] { display: none; }
+  #gptCustomFile { width: 100%; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  details.gpt-journal { margin-top: 12px; }
+  details.gpt-journal summary { cursor: pointer; list-style: none; font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; }
+  details.gpt-journal summary::-webkit-details-marker { display: none; }
+  details.gpt-journal summary::before { content: '▸ '; }
+  details.gpt-journal[open] summary::before { content: '▾ '; }
+  .gpt-log { margin: 8px 0; padding: 7px 8px 7px 24px; max-height: 170px; overflow-y: auto;
+    background: var(--s2); border: 1px solid var(--border); border-radius: 7px;
+    font: 10px/1.5 ui-monospace, Consolas, monospace; color: #c9c9ee; }
+  .gpt-log:empty::before { content: 'Пока пусто. Задайте вопрос ChatGPT.'; margin-left: -16px; color: var(--muted);
+    font-family: 'Segoe UI', system-ui, sans-serif; }
+  .gpt-log li { overflow-wrap: anywhere; }
+
+  .foot { padding: 10px 18px; background: var(--s1); border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; }
+  .foot .ver { margin-left: auto; font-size: 10px; color: var(--muted); }
+  .foot .btn { padding: 6px 10px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <img src="icons/icon128.png" alt="">
+  <div>
+    <div class="brand-name">Кит</div>
+    <div class="brand-sub">ГрамФикс · Шаблоны · Невидимка · st-fix · Сигнал</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-pane="gf"><span class="ico">✨</span>Текст</button>
+  <button class="tab" data-pane="tpl"><span class="ico">📝</span>Шаблоны</button>
+  <button class="tab" data-pane="st"><span class="ico">🕶</span>Невидимка</button>
+  <button class="tab" data-pane="fix"><span class="ico">🩹</span>st-fix</button>
+  <button class="tab" data-pane="gpt"><span class="ico">🔔</span>Сигнал</button>
+</div>
+
+<!-- ============ ГРАМФИКС ============ -->
+<div class="pane on" id="pane-gf">
+  <div class="row">
+    <div>
+      <div class="row-name">✨ ГрамФикс</div>
+      <div class="row-desc">Меню правки в любом поле ввода на всех сайтах</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gfOn"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="stat-num" id="fixCount">0</div>
+      <div class="row-desc">ошибок исправлено</div>
+    </div>
+    <div style="text-align:right">
+      <div class="row-desc">✏️ Исправить <kbd>Ctrl+Shift+F</kbd></div>
+      <div class="row-desc">🪄 Сформулировать <kbd>Ctrl+Shift+S</kbd></div>
+      <div class="row-desc">🌐 На английский <kbd>Ctrl+Shift+E</kbd></div>
+      <div class="row-desc" style="margin-top:3px">кнопка у поля — только «Исправить»,<br>остальное по клавишам</div>
+    </div>
+  </div>
+
+  <div class="blk-title">🤖 Сервис для ГрамФикса</div>
+  <select id="gfProvider">
+    <option value="anthropic">Claude (Anthropic)</option>
+    <option value="openai">ChatGPT (OpenAI)</option>
+  </select>
+
+  <div id="claudeSettings">
+    <div class="blk-title" style="margin-top:14px">🔑 Anthropic API ключ</div>
+    <div class="field-row">
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off">
+      <button class="btn" id="saveKey">Сохранить</button>
+    </div>
+    <div class="status" id="apiStatus"></div>
+    <div class="hint">Ключ на <a href="https://platform.claude.com/settings/keys" target="_blank">platform.claude.com</a>. Прежний ключ сохранится.</div>
+    <div class="blk-title" style="margin-top:14px">🧠 Модель Claude</div>
+    <select id="gfModel">
+      <option value="claude-haiku-5-5">Haiku 5.5 · самая быстрая и дешёвая</option>
+      <option value="claude-sonnet-5-5">Sonnet 5.5 · баланс скорости и качества</option>
+      <option value="claude-opus-5-5">Opus 5.5 · умнее, но дороже</option>
+      <option value="claude-fable-5-1">Fable 5.1 · самая сильная и медленная</option>
+      <option value="claude-haiku-4-5-20251001">Haiku 4.5 · прежняя модель</option>
+    </select>
+  </div>
+
+  <div id="openaiSettings" style="display:none">
+    <div class="blk-title" style="margin-top:14px">🔑 OpenAI API ключ</div>
+    <div class="field-row">
+      <input type="password" id="openaiApiKey" placeholder="sk-proj-..." autocomplete="off">
+      <button class="btn" id="saveOpenaiKey">Сохранить</button>
+    </div>
+    <div class="status" id="openaiStatus"></div>
+    <div class="hint">Ключ на <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>. API оплачивается отдельно от подписки ChatGPT. Ключ остаётся в браузере.</div>
+    <div class="blk-title" style="margin-top:14px">🧠 Модель OpenAI</div>
+    <select id="gfOpenaiModel">
+      <option value="gpt-4.1-mini">GPT-4.1 mini · быстрая, рекомендую для правки</option>
+      <option value="gpt-5-mini">GPT-5 mini · более сильная</option>
+      <option value="gpt-4.1-nano">GPT-4.1 nano · экономная</option>
+    </select>
+  </div>
+  <div class="status" id="modelStatus"></div>
+  <div class="hint" id="gfModelHint"></div>
+
+  <div class="row" style="margin-top:10px">
+    <div>
+      <div class="row-name">Уведомления</div>
+      <div class="row-desc">Показывать, что именно исправлено</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gfDiff"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="blk-title" style="margin-top:12px">⏱ Автоисправление</div>
+
+  <div class="row" style="padding-top:0">
+    <div>
+      <div class="row-name">При уходе из поля</div>
+      <div class="row-desc">Когда кликнул мимо, а в поле что-то печатали</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gfAuto"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">После паузы в печати</div>
+      <div class="row-desc">На значке идёт обратный отсчёт: клик — исправить сразу, Esc — отменить</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gfPause"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="range-row" id="delayRow">
+    <span class="range-lbl">Пауза</span>
+    <input type="range" id="gfDelay" min="1" max="15" step="1">
+    <span class="range-val" id="gfDelayVal">3 с</span>
+  </div>
+  <div class="hint">Оба режима тратят токены без явного нажатия. Срабатывают от 10 символов.</div>
+
+  <button class="btn wide" id="fixPage" style="margin-top:12px"><span>⚡</span><span>Исправить все поля на странице</span></button>
+  <button class="btn wide ghost" id="diagBtn" style="margin-top:8px"><span>🔍</span><span>Диагностика активной вкладки</span></button>
+  <button class="btn wide ghost" id="resetPos" style="margin-top:8px"><span>📍</span><span>Вернуть значок к полю ввода</span></button>
+  <div id="diagOut"></div>
+</div>
+
+<!-- ============ ШАБЛОНЫ ============ -->
+<div class="pane" id="pane-tpl">
+  <div class="row">
+    <div>
+      <div class="row-name">📝 Шаблоны ВК</div>
+      <div class="row-desc">Кнопка на vk.com / vk.ru: группы, переменные, вставка в диалог</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="tplOn"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Сейчас сохранено</div>
+      <div class="row-desc" id="tplStat">—</div>
+    </div>
+  </div>
+
+  <div class="hint" style="margin-top:10px">
+    Круглая кнопка 📝 появляется поверх страницы ВК — её можно перетащить в любое место.
+    Внутри панели: вкладки-группы, кнопка «✎» для управления группами, «⚙» — личные данные
+    для переменных ({Ваше имя}, {Название сообщества} и т.д.), а также экспорт и импорт шаблонов.
+  </div>
+
+  <div class="hint" style="margin-top:8px">
+    Переносишь данные со старого расширения «VK Шаблоны»? Экспортируй там файл
+    <b>vk-templates.json</b> и загрузи его кнопкой «Импорт» внизу этого окна.
+  </div>
+</div>
+
+<!-- ============ НЕВИДИМКА ============ -->
+<div class="pane" id="pane-st">
+  <div class="row">
+    <div>
+      <div class="row-name">🕶 Невидимка</div>
+      <div class="row-desc">Модуль невидимки на ВК (как в Kate Mobile)</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="stMod"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Не помечать прочитанным</div>
+      <div class="row-desc">Собеседник не видит, что сообщение прочитано</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="stOn"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Скрывать онлайн</div>
+      <div class="row-desc">Не показывать «online», остаётся «был(а) в сети»</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="stOnline"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Скрывать «печатает…»</div>
+      <div class="row-desc">Собеседник не видит, что ты набираешь сообщение</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="stTyping"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="blk-title" style="margin-top:12px">Активная вкладка</div>
+  <div class="status" id="stStatus"></div>
+
+  <div class="hint" style="margin-top:10px">
+    На самой странице ВК ничего не рисуется, управление только отсюда.
+    Переключатели действуют сразу на всех открытых вкладках ВК, перезагружать не нужно.
+    Скрытие онлайна работает только пока ты сидишь в веб-версии; мобильное приложение всё равно покажет онлайн.
+  </div>
+
+  <div class="blk-title" style="margin-top:14px">Тонкая настройка «онлайна»</div>
+  <input type="text" id="stRe" placeholder="свои признаки запроса через запятую (пусто = стандартные)">
+  <div class="hint">Если ВК поменяет протокол и онлайн снова начнёт гореть, сюда вставляется новый список признаков. Сохраняется по Enter или при уходе из поля.</div>
+
+  <div class="row" style="margin-top:8px">
+    <div>
+      <div class="row-name">Диагностика запросов</div>
+      <div class="row-desc">Вести журнал запросов ВК-клиента для подбора признаков</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="stDiag"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+  <button class="btn wide ghost" id="stCopyLog" style="margin-top:8px"><span>📋</span><span>Скопировать журнал активной вкладки</span></button>
+  <div class="hint">Включи, посиди пару минут в диалогах ВК, потом скопируй журнал и пришли его: по нему подбираются точные признаки. В обычной работе держи выключенным.</div>
+</div>
+
+<!-- ============ VK ST FIX ============ -->
+<div class="pane" id="pane-fix">
+  <div class="row">
+    <div>
+      <div class="row-name">🩹 VK st fix</div>
+      <div class="row-desc">Подмена битого шарда статики ВК (пустые «скелеты» вместо контента)</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="fixOn"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="blk-title" style="margin-top:12px">Правило перенаправления</div>
+  <div class="field-row" style="align-items:center">
+    <input type="text" id="fixFrom" placeholder="54" style="width:74px;text-align:center">
+    <div style="color:var(--muted);font-size:15px">→</div>
+    <input type="text" id="fixTo" placeholder="st1-53.vk.ru">
+  </div>
+  <div class="hint">Слева — номер битого шарда (<code>st*-54.vk.ru</code>), справа — рабочий хост целиком.</div>
+  <button class="btn wide" id="saveFix" style="margin-top:10px"><span>💾</span><span>Применить правило</span></button>
+  <div class="status" id="fixStatus"></div>
+
+  <div class="blk-title" style="margin-top:12px">🛰 Сторож и журнал</div>
+  <div class="row" style="padding-top:0">
+    <div>
+      <div class="row-name">Пойманные шарды</div>
+      <div class="row-desc" id="sentryStat">—</div>
+    </div>
+  </div>
+  <div class="hint">Сторож слушает сетевые ошибки ВК: если сломается ещё один шард (битый сертификат) — сам добавит правило и запишет событие в журнал. Отчёт удобно кидать в тикет поддержки ВК.</div>
+  <div class="field-row" style="margin-top:10px">
+    <button class="btn ghost" id="fixReport" style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px"><span>📋</span><span>Скопировать отчёт</span></button>
+    <button class="btn ghost" id="fixClear" style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px"><span>🧹</span><span>Очистить журнал</span></button>
+  </div>
+</div>
+
+<!-- ============ СИГНАЛ CHATGPT ============ -->
+<div class="pane" id="pane-gpt">
+  <div class="row">
+    <div>
+      <div class="row-name">🔔 Сигнал ChatGPT</div>
+      <div class="row-desc">Звук и галочка на вкладке, когда ChatGPT закончил отвечать</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gptOn"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="status" id="gptTab"></div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Только в фоне</div>
+      <div class="row-desc">Молчать, если вкладка ChatGPT и так перед глазами</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gptBg"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Отмечать вкладку</div>
+      <div class="row-desc">Зелёная галочка вместо значка, пока вкладку не откроешь</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gptMark"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="row">
+    <div>
+      <div class="row-name">Уведомление Windows</div>
+      <div class="row-desc">Всплывающее окно, когда ты не на ChatGPT; клик — открыть вкладку</div>
+    </div>
+    <label class="sw"><input type="checkbox" id="gptNotify"><div class="sw-trk"></div><div class="sw-dot"></div></label>
+  </div>
+
+  <div class="blk-title" style="margin-top:12px">🎵 Звук</div>
+  <select id="gptSound">
+    <option value="chime">Колокольчик</option>
+    <option value="ding">Дзынь</option>
+    <option value="soft">Мягкий аккорд</option>
+    <option value="triple">Три бипа</option>
+    <option value="coin">Монетка</option>
+    <option value="custom">Свой файл…</option>
+  </select>
+  <div id="gptCustomBox" hidden>
+    <input type="file" id="gptCustomFile" accept="audio/*">
+    <div class="hint" id="gptCustomName">mp3, wav или ogg до 3 МБ</div>
+  </div>
+
+  <div class="range-row" style="margin-top:8px">
+    <span class="range-lbl">Громкость</span>
+    <input type="range" id="gptVolume" min="0" max="100" step="5">
+    <span class="range-val" id="gptVolumeVal">70%</span>
+  </div>
+
+  <button class="btn wide" id="gptTest"><span>🔊</span><span>Проверить звук</span></button>
+  <div class="status" id="gptStatus"></div>
+
+  <div class="gpt-stats">
+    <div><b id="gptToday">0</b><span>сегодня</span></div>
+    <div><b id="gptDings">0</b><span>всего ответов</span></div>
+    <div><b id="gptWait">0 мин</b><span>ждали всего</span></div>
+    <div><b id="gptLongest">—</b><span>самый долгий</span></div>
+  </div>
+  <div style="text-align:right;margin-top:4px"><button class="linkbtn" id="gptResetStats">обнулить статистику</button></div>
+
+  <details class="gpt-journal" id="gptJournal">
+    <summary>Журнал событий</summary>
+    <ol class="gpt-log" id="gptLog"></ol>
+    <div class="field-row">
+      <button class="btn ghost" id="gptCopyLog" style="flex:1">📋 Скопировать</button>
+      <button class="btn ghost" id="gptClearLog" style="flex:1">🧹 Очистить</button>
+    </div>
+  </details>
+  <div class="hint">Работает только на chatgpt.com в браузере. Текст переписки не читается и никуда не отправляется.</div>
+</div>
+
+<div class="foot">
+  <button class="btn ghost" id="expBtn">⬇ Экспорт</button>
+  <button class="btn ghost" id="impBtn">⬆ Импорт</button>
+  <input type="file" id="impFile" accept="application/json,.json" hidden>
+  <div class="ver" id="ver">Кит</div>
+</div>
+
+<script src="content/gpt-sounds.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
