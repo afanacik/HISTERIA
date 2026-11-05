@@ -16,7 +16,12 @@ const els = {
   customName: $('customName'),
   test: $('testSound'),
   status: $('status'),
-  tabStatus: $('tabStatus')
+  tabStatus: $('tabStatus'),
+  journal: $('journal'),
+  logList: $('logList'),
+  copyLog: $('copyLog'),
+  clearLog: $('clearLog'),
+  version: $('version')
 };
 
 function save(patch) {
@@ -100,6 +105,17 @@ els.customFile.addEventListener('change', () => {
   reader.readAsDataURL(file);
 });
 
+async function playInPopup(reason) {
+  let dataUrl = null;
+  if (els.sound.value === 'custom') {
+    const { customSound } = await chrome.storage.local.get('customSound');
+    dataUrl = customSound && customSound.dataUrl;
+  }
+  await MyGptSignalSounds.play({ sound: els.sound.value, volume: Number(els.volume.value), dataUrl });
+  els.status.textContent = `Сыграно прямо в этом окне. Фоновый плеер не сработал (${reason}) — ` +
+    'сигнал после ответа будет играть на странице ChatGPT.';
+}
+
 els.test.addEventListener('click', async () => {
   if (Number(els.volume.value) === 0) {
     els.status.textContent = 'Громкость на нуле — прибавьте её.';
@@ -113,15 +129,61 @@ els.test.addEventListener('click', async () => {
       preview: { sound: els.sound.value, volume: Number(els.volume.value) },
       withNotification: els.notify.checked
     });
-    els.status.textContent = result && result.ok
-      ? 'Сигнал отправлен. Не слышно? Проверьте громкость системы и браузера.'
-      : `Не получилось воспроизвести звук${result && result.error ? `: ${result.error}` : '.'}`;
+    if (result && result.ok) {
+      els.status.textContent = 'Сигнал отправлен. Не слышно? Проверьте громкость системы и браузера.';
+    } else {
+      await playInPopup(result && result.error || 'нет ответа');
+    }
   } catch (error) {
-    els.status.textContent = `Не получилось воспроизвести звук: ${error.message || error}`;
+    try {
+      await playInPopup(error.message || String(error));
+    } catch (error2) {
+      els.status.textContent = `Не получилось воспроизвести звук: ${error2.message || error2}`;
+    }
   } finally {
     els.test.disabled = false;
   }
 });
+
+function renderLog(lines) {
+  els.logList.replaceChildren(...(lines || []).slice().reverse().map((line) => {
+    const li = document.createElement('li');
+    li.textContent = line;
+    return li;
+  }));
+}
+
+async function loadLog() {
+  const { log } = await chrome.storage.session.get('log');
+  renderLog(log);
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'session' && changes.log) renderLog(changes.log.newValue);
+});
+
+els.copyLog.addEventListener('click', async () => {
+  const { log = [] } = await chrome.storage.session.get('log');
+  const text = `Мой сигнал v${chrome.runtime.getManifest().version}, ${navigator.userAgent}\n` + log.join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    els.status.textContent = 'Журнал скопирован — вставьте его в чат.';
+  } catch (_) {
+    els.status.textContent = 'Не удалось скопировать — сделайте скриншот журнала.';
+  }
+});
+
+els.clearLog.addEventListener('click', async () => {
+  await chrome.storage.session.set({ log: [] });
+});
+
+els.journal.addEventListener('toggle', () => {
+  try { localStorage.setItem('journalOpen', els.journal.open ? '1' : ''); } catch (_) {}
+});
+try { if (localStorage.getItem('journalOpen')) els.journal.open = true; } catch (_) {}
+
+els.version.textContent = `v${chrome.runtime.getManifest().version}`;
+loadLog();
 
 initialize().catch(() => { els.status.textContent = 'Не удалось загрузить настройки.'; });
 checkCurrentTab();

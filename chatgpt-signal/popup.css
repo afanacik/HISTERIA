@@ -31,6 +31,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { width: 340px; margin: 0; color: var(--fg); background: var(--bg); }
 main { padding: 16px 18px 14px; }
 header { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
@@ -61,3 +62,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .tab-status.ok { background: var(--ok-bg); color: var(--ok); }
 .tab-status.warn { background: var(--warn-bg); color: var(--warn); }
 .privacy { margin: 4px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+
+.journal { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.journal summary { cursor: pointer; list-style: none; }
+.journal summary::-webkit-details-marker { display: none; }
+.journal summary strong::before { content: "▸ "; color: var(--muted); }
+.journal[open] summary strong::before { content: "▾ "; }
+.log { margin: 8px 0; padding: 7px 8px 7px 26px; max-height: 190px; overflow-y: auto; border-radius: 7px; background: var(--chip); font: 10.5px/1.45 ui-monospace, Consolas, monospace; color: var(--fg); }
+.log:empty::before { content: "Пока пусто. Обновите вкладку ChatGPT и задайте вопрос."; color: var(--muted); font-family: system-ui, sans-serif; margin-left: -18px; }
+.log li { margin: 1px 0; overflow-wrap: anywhere; }
+.log-actions { display: flex; gap: 8px; }
+button.secondary { padding: 7px 10px; background: var(--chip); color: var(--chip-fg); font-size: 12px; }
+button.secondary:hover { background: var(--line); }

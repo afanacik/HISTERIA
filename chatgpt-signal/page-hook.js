@@ -1,11 +1,9 @@
 // Работает в контексте самой страницы ChatGPT (world: MAIN) и запускается
-// раньше её собственных скриптов. Задача одна: заметить, когда начинается
-// и заканчивается потоковый ответ ChatGPT (запрос .../backend-api/.../conversation
-// с типом text/event-stream).
+// раньше её собственных скриптов. Замечает, когда начинается и
+// заканчивается потоковый ответ (text/event-stream с chatgpt.com/backend-api).
 //
-// Содержимое ответа НЕ читается и никуда не передаётся: мы читаем копию
-// потока только для того, чтобы узнать момент его окончания, а сами
-// данные сразу отбрасываются.
+// Содержимое ответа НЕ читается и никуда не передаётся: копия потока
+// читается только ради момента его окончания, данные сразу отбрасываются.
 (() => {
   'use strict';
   if (window.__myGptSignalHooked) return;
@@ -15,8 +13,8 @@
   const originalFetch = window.fetch;
   let nextId = 1;
 
-  function emit(type, id) {
-    window.postMessage({ source: SOURCE, type, id }, location.origin);
+  function emit(type, id, path) {
+    window.postMessage({ source: SOURCE, type, id, path }, location.origin);
   }
 
   function requestUrl(input) {
@@ -29,18 +27,22 @@
     }
   }
 
-  function isConversationRequest(input) {
+  // Путь без идентификаторов чатов — только для журнала диагностики.
+  function shortPath(pathname) {
+    return pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{20,}|[0-9a-f]{16,}/gi, ':id');
+  }
+
+  function backendPath(input) {
     try {
       const url = new URL(requestUrl(input), location.href);
-      return url.origin === location.origin &&
-        url.pathname.includes('/backend-api/') &&
-        url.pathname.includes('conversation');
+      if (url.origin !== location.origin || !url.pathname.includes('/backend-')) return null;
+      return shortPath(url.pathname);
     } catch (_) {
-      return false;
+      return null;
     }
   }
 
-  function watchStream(response) {
+  function watchStream(response, path) {
     const type = response.headers.get('content-type') || '';
     if (!type.includes('text/event-stream') || !response.body) return;
 
@@ -52,33 +54,30 @@
     }
 
     const id = nextId++;
-    emit('stream-start', id);
+    emit('stream-start', id, path);
     (async () => {
       try {
         for (;;) {
           const { done } = await reader.read();
           if (done) break;
         }
-        emit('stream-done', id);
+        emit('stream-done', id, path);
       } catch (_) {
-        // Поток оборван: пользователь нажал «Стоп», ушёл в другой чат или
-        // пропала сеть. Это не «готовый ответ».
-        emit('stream-aborted', id);
+        // Поток оборван: «Стоп», переход в другой чат, обрыв сети.
+        emit('stream-aborted', id, path);
       }
     })();
   }
 
   function patchedFetch(input, init) {
-    const promise = originalFetch.apply(this, arguments);
-    if (isConversationRequest(input)) {
-      promise.then(watchStream, () => {});
-    }
+    const promise = originalFetch.apply(window, arguments);
+    const path = backendPath(input);
+    if (path) promise.then((response) => watchStream(response, path), () => {});
     return promise;
   }
 
-  // Сохраняем «нативный» вид функции, чтобы не сломать код страницы,
-  // который может проверять fetch.toString().
   Object.defineProperty(patchedFetch, 'name', { value: 'fetch' });
   patchedFetch.toString = () => originalFetch.toString();
   window.fetch = patchedFetch;
+  emit('hook-ready', 0, '');
 })();

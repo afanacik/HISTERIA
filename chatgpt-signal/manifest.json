@@ -1,10 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Мой сигнал для ChatGPT",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Личный звуковой сигнал (и уведомление), когда ChatGPT закончил отвечать.",
   "minimum_chrome_version": "116",
-  "permissions": ["offscreen", "storage", "notifications"],
+  "permissions": [
+    "offscreen",
+    "storage",
+    "notifications"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -26,14 +30,25 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
-      "js": ["page-hook.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "page-hook.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "sounds.js",
+        "content.js"
+      ],
       "run_at": "document_start"
     }
   ],

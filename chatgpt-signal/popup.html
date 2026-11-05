@@ -57,8 +57,19 @@
 
     <button id="testSound" type="button">Проверить звук</button>
     <p id="status" class="status" role="status" aria-live="polite"></p>
-    <p class="privacy">Работает локально. Текст переписки не читается, не сохраняется и не отправляется.</p>
+
+    <details id="journal" class="journal">
+      <summary><strong>Журнал событий</strong><small>Что расширение видело на странице</small></summary>
+      <ol id="logList" class="log"></ol>
+      <div class="log-actions">
+        <button id="copyLog" type="button" class="secondary">Копировать</button>
+        <button id="clearLog" type="button" class="secondary">Очистить</button>
+      </div>
+    </details>
+
+    <p class="privacy">Работает локально. Текст переписки не читается, не сохраняется и не отправляется. <span id="version"></span></p>
   </main>
+  <script src="sounds.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -10,6 +10,21 @@ const DEFAULTS = {
 const CHAT_HOSTS = new Set(['chatgpt.com', 'chat.openai.com']);
 let creatingOffscreen = null;
 
+// ---------- Журнал диагностики (последние события, только в памяти браузера) ----------
+
+const LOG_LIMIT = 40;
+let logChain = Promise.resolve();
+
+function addLog(text) {
+  const time = new Date().toLocaleTimeString('ru-RU');
+  logChain = logChain.then(async () => {
+    const { log = [] } = await chrome.storage.session.get('log');
+    log.push(`${time}  ${text}`);
+    await chrome.storage.session.set({ log: log.slice(-LOG_LIMIT) });
+  }).catch(() => {});
+  return logChain;
+}
+
 // ---------- Звук через offscreen-документ ----------
 
 async function ensureOffscreenDocument() {
@@ -51,7 +66,7 @@ async function sendToPlayer(payload) {
 
 async function playSound(settings) {
   const volume = Math.max(0, Math.min(100, Number(settings.volume) || 0));
-  if (volume === 0) return;
+  if (volume === 0) return { ok: true, result: 'muted' };
 
   let customSound = null;
   if (settings.sound === 'custom') {
@@ -60,7 +75,7 @@ async function playSound(settings) {
   }
 
   await ensureOffscreenDocument();
-  await sendToPlayer({
+  return sendToPlayer({
     type: 'PLAY_SOUND',
     sound: customSound ? 'custom' : (settings.sound === 'custom' ? 'chime' : settings.sound),
     dataUrl: customSound,
@@ -99,6 +114,10 @@ chrome.notifications.onClicked.addListener(async (id) => {
   }
 });
 
+chrome.runtime.onInstalled.addListener((details) => {
+  addLog(`Расширение ${details.reason === 'install' ? 'установлено' : 'обновлено'} (v${chrome.runtime.getManifest().version}). Обновите вкладки ChatGPT (F5).`);
+});
+
 chrome.notifications.onClosed.addListener((id) => {
   chrome.storage.session.remove(id);
 });
@@ -123,26 +142,54 @@ function fromPopup(sender) {
 
 async function handleAnswerFinished(message, sender) {
   const settings = await chrome.storage.local.get(DEFAULTS);
-  if (!settings.enabled) return { ok: true, skipped: 'disabled' };
-  if (settings.backgroundOnly && !message.inBackground) return { ok: true, skipped: 'foreground' };
+  if (!settings.enabled) {
+    addLog('Сигнал выключен в настройках — молчу');
+    return { ok: true, skipped: 'disabled' };
+  }
+  if (settings.backgroundOnly && !message.inBackground) {
+    addLog('Вы смотрите на вкладку, а включено «Только в фоне» — молчу');
+    return { ok: true, skipped: 'foreground' };
+  }
 
-  const tasks = [playSound(settings)];
-  if (settings.notify) tasks.push(showNotification(sender.tab));
-  const results = await Promise.allSettled(tasks);
-  const failed = results.find((r) => r.status === 'rejected');
-  if (failed) throw failed.reason;
-  return { ok: true };
+  if (settings.notify) {
+    showNotification(sender.tab).catch((e) => addLog(`Уведомление не показано: ${errorText(e)}`));
+  }
+  try {
+    const result = await playSound(settings);
+    addLog(result && result.result === 'muted' ? 'Громкость 0 — звук не слышен' : 'Звук сыгран ✓');
+    return { ok: true };
+  } catch (error) {
+    addLog(`Фоновый плеер не сработал: ${errorText(error)}`);
+    throw error;
+  }
 }
 
 async function handleTest(message) {
   const settings = { ...(await chrome.storage.local.get(DEFAULTS)), ...(message.preview || {}) };
-  await playSound(settings);
-  if (message.withNotification) await showNotification(null);
+  try {
+    await playSound(settings);
+  } catch (error) {
+    addLog(`Проверка звука: фоновый плеер не сработал: ${errorText(error)}`);
+    throw error;
+  }
+  addLog('Проверка звука: сыгран ✓');
+  if (message.withNotification) {
+    await showNotification(null).catch((e) => addLog(`Уведомление не показано: ${errorText(e)}`));
+  }
   return { ok: true };
+}
+
+function errorText(error) {
+  return String(error && error.message || error);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message !== 'object') return;
+
+  if (message.type === 'LOG' && fromChatPage(sender) && typeof message.text === 'string') {
+    addLog(message.text.slice(0, 200));
+    return;
+  }
 
   let job;
   if (message.type === 'ANSWER_FINISHED' && fromChatPage(sender)) {
@@ -155,7 +202,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   job.then(sendResponse).catch((error) => {
     console.warn('[Мой сигнал]', error);
-    sendResponse({ ok: false, error: String(error && error.message || error) });
+    sendResponse({ ok: false, error: errorText(error) });
   });
   return true;
 });
